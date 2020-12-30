@@ -28,12 +28,16 @@ main:		li	$s0, 25			# Nave inicia no meio da tela
 		li	$s1, 0x0000FFFF		# Redesenha uma posição a cima
 		jal	ally_ship		# Desenha a nave inicialmente
 
-
 		li	$s4, 0x00000000		# Inicia sem naves nem tiros inimigos
 		li	$s6, 0			# Contador de loop de atualização de tela para
 						#	temporização de animação dos tiros inimigos
 		li	$s7, 0			# Contador de loop de atualização de tela para
 						#	temporização de animação do tiro aliado
+
+		li	$t7, 0			# Pré-seta a posição horizontal do tiro 1
+		li	$t6, 0			# Pré-seta a posição horizontal do tiro 2
+		li	$t5, 0			# Pré-seta a posição horizontal do tiro 3
+		li	$t4, 0			# Pré-seta a posição horizontal do tiro 4
 
 main_loop:	li	$s2, 0			# Reseta registrador de input do MMIO
 		jal	MMIO_read		# Verifica input pelo terminal MMIO
@@ -199,7 +203,7 @@ ally_shot:	subi	$sp, $sp, 4
 
 		bne	$s7, 0x00000100, end_ally_shot
 						# Ajuste de frequencia de animação.
-						#	Animação é executada a cada 50 "frames"
+						#	Animação é executada a cada 100 "frames"
 		jal	ally_shot_anim		
 
 		bne	$t9, 252, end_ally_shot	# Verifica se o tiro chegou ao final da tela.
@@ -327,7 +331,7 @@ enemy_entities:	subi	$sp, $sp, 4
 		
 enemy_verif:	jal	enemy_cllsion		# Verifica colisão do tiro aliado com as naves
 						#	inimigas
-		jal	enely_shots		# Verifica o lançamento de um tiro inimigo em 
+		jal	enemy_shots		# Verifica o lançamento de um tiro inimigo em 
 						#	direção à nave aliada
 
 end_enemy_entts:lw	$ra, ($sp)
@@ -458,14 +462,251 @@ end_enemy_cll:	lw	$ra, ($sp)
 
 # Função que observa as naves inimigas existentes e a posição da nave inimiga para determinar um
 # um ataque inimigo.
+#	t7 - Posição horizontal do tiro 1
+#	t6 - Posição horizontal do tiro 2
+#	t5 - Posição horizontal do tiro 3
+#	t4 - Posição horizontal do tiro 4
 
 enemy_shots:	subi	$sp, $sp, 4
 		sw	$ra, ($sp)		# Salva na pilha de chamada
 
-		andi	$t0, $s4, 0x000F000F	# Filtra a existencia da primera nave e primeiro 
+		addu	$s6, $s6, 1		# Contagem de "frames" para o proximo quadro da 
+						#	animação.
+
+		bne	$s6, 0x00000300, end_ally_shot
+						# Ajuste de frequencia de animação.
+						#	Animação é executada a cada 150 "frames"
+		li	$s6, 0x00000000
+
+enemy_shot_1:	andi	$t0, $s4, 0x000F000F	# Filtra a existencia da primera nave e primeiro 
 						#	tiro
+		bne	$t0, 0x0000000F, enemy_anim_1
+						# Se não existir o tiro, mas a nave existir, 
+						#	tiro deve ser criado
+						# CC, continua a verificação
+
+		bgt	$s0, 7, enemy_anim_1
+
+		# Inicia tiro 1
+		ori	$s4, $s4, 0x000F0000	# Adiciona o tiro no indicador de entidades
+		li	$t7, 208		# Seta nível horizontal to tiro
+
+enemy_anim_1:	andi	$t0, $s4, 0x000F0000	# Filtra a existencia do primero tiro
+		bne	$t0, 0x000F0000, enemy_shot_2
+						# Se existir o tiro e a nave, deve-se rodar uma
+						#	etapa da animação.
+						# CC, continua a verificação
+
+		# Roda a animaçao
+		li	$t0, 9
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t7		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim		# Executa um 'frame' de animação do tiro
+		subi	$t7, $t7, 4
+
+		# Verifica se chegou à extremidade direita da tela
+		bnez	$t7, clsion_shot_1	# Se o tiro estiver no final da tela, ele deve
+						#	ser apagado
+
+		andi	$s4, $s4, 0xFFF0FFFF	# Retira o tiro do indicador de entidades
+
+		li	$t0, 9
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t7		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim		# Apaga o tiro no final da tela
+
+		li	$t7, 0
+		
+clsion_shot_1:	bne	$t7, 20, enemy_shot_2
+		bgt	$s0, 9, enemy_shot_2
+
+		li	$v0, 10
+		syscall				# Encerra o programa
+
+enemy_shot_2:	andi	$t0, $s4, 0x00F000F0	# Filtra a existencia da primera nave e primeiro 
+						#	tiro
+		bne	$t0, 0x000000F0, enemy_anim_2
+						# Se não existir o tiro, mas a nave existir, 
+						#	tiro deve ser criado
+						# CC, continua a verificação
+
+		bgt	$s0, 22, enemy_anim_2
+		blt	$s0, 15, enemy_anim_2
+
+		ori	$s4, $s4, 0x00F00000	# Adiciona o tiro no indicador de entidades
+
+		# Inicia tiro 2
+		ori	$s4, $s4, 0x00F00000	# Adiciona o tiro no indicador de entidades
+		li	$t6, 208		# Seta nível horizontal to tiro
+
+enemy_anim_2:	andi	$t0, $s4, 0x00F00000	# Filtra a existencia do primero tiro
+		bne	$t0, 0x00F00000, enemy_shot_3
+						# Se existir o tiro e a nave, deve-se rodar uma
+						#	etapa da animação.
+						# CC, continua a verificação
+
+		# Roda a animaçao
+		li	$t0, 24
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t6		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim		# Executa um 'frame' de animação do tiro
+		subi	$t6, $t6, 4
+
+		# Verifica se chegou à extremidade direita da tela
+		bnez	$t6, clsion_shot_2	# Se o tiro estiver no final da tela, ele deve
+						#	ser apagado
+
+		andi	$s4, $s4, 0xFF0FFFFF	# Retira o tiro do indicador de entidades
+
+		li	$t0, 24
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t6		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim		# Apaga o tiro no final da tela
+
+		li	$t6, 0
+		
+clsion_shot_2:	bne	$t6, 20, enemy_shot_3
+		bgt	$s0, 24, enemy_shot_3
+		blt	$s0, 14, enemy_shot_3
+
+		li	$v0, 10
+		syscall				# Encerra o programa
+
+enemy_shot_3:	andi	$t0, $s4, 0x0F000F00	# Filtra a existencia da primera nave e primeiro 
+						#	tiro
+		bne	$t0, 0x00000F00, enemy_anim_3
+						# Se não existir o tiro, mas a nave existir, 
+						#	tiro deve ser criado
+						# CC, continua a verificação
+
+		bgt	$s0, 37, enemy_anim_3
+		blt	$s0, 30, enemy_anim_3
+
+		ori	$s4, $s4, 0x0F000000	# Adiciona o tiro no indicador de entidades
+
+		# Inicia tiro 3
+		ori	$s4, $s4, 0x0F000000	# Adiciona o tiro no indicador de entidades
+		li	$t5, 208		# Seta nível horizontal to tiro
+
+enemy_anim_3:	andi	$t0, $s4, 0x0F000000	# Filtra a existencia do primero tiro
+		bne	$t0, 0x0F000000, enemy_shot_4
+						# Se existir o tiro e a nave, deve-se rodar uma
+						#	etapa da animação.
+						# CC, continua a verificação
+
+		# Roda a animaçao
+		li	$t0, 39
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t5		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim		# Executa um 'frame' de animação do tiro
+		subi	$t5, $t5, 4
+
+		# Verifica se chegou à extremidade direita da tela
+		bnez	$t5, clsion_shot_3	# Se o tiro estiver no final da tela, ele deve
+						#	ser apagado
+
+		andi	$s4, $s4, 0xF0FFFFFF	# Retira o tiro do indicador de entidades
+
+		li	$t0, 39
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t5		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim		# Apaga o tiro no final da tela
+
+		li	$t5, 0
+		
+clsion_shot_3:	bne	$t5, 20, enemy_shot_4
+		bgt	$s0, 39, enemy_shot_4
+		blt	$s0, 29, enemy_shot_4
+
+		li	$v0, 10
+		syscall				# Encerra o programa
+
+enemy_shot_4:	andi	$t0, $s4, 0xF000F000	# Filtra a existencia da primera nave e primeiro 
+						#	tiro
+		bne	$t0, 0x0000F000, enemy_anim_4
+						# Se não existir o tiro, mas a nave existir, 
+						#	tiro deve ser criado
+						# CC, continua a verificação
+
+		blt	$s0, 45, enemy_anim_4
+
+		ori	$s4, $s4, 0xF0000000	# Adiciona o tiro no indicador de entidades
+
+		# Inicia tiro 4
+		ori	$s4, $s4, 0xF0000000	# Adiciona o tiro no indicador de entidades
+		li	$t4, 208		# Seta nível horizontal to tiro
+
+enemy_anim_4:	andi	$t0, $s4, 0xF0000000	# Filtra a existencia do primero tiro
+		bne	$t0, 0xF0000000, end_enemy_shots
+						# Se existir o tiro e a nave, deve-se rodar uma
+						#	etapa da animação.
+						# CC, continua a verificação
+
+		# Roda a animaçao
+		li	$t0, 54
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t4		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim		# Executa um 'frame' de animação do tiro
+		subi	$t4, $t4, 4
+
+		# Verifica se chegou à extremidade direita da tela
+		bnez	$t4, clsion_shot_4	# Se o tiro estiver no final da tela, ele deve
+						#	ser apagado
+
+		andi	$s4, $s4, 0x0FFFFFFF	# Retira o tiro do indicador de entidades
+
+		li	$t0, 54
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+		add	$t0, $t0, $t4		# Adiciona a posição horizontal do tiro
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim		# Apaga o tiro no final da tela
+
+		li	$t4, 0
+		
+clsion_shot_4:	bne	$t4, 20, end_enemy_shots
+		bgt	$s0, 54, end_enemy_shots
+		blt	$s0, 44, end_enemy_shots
+
+		li	$v0, 10
+		syscall				# Encerra o programa
 
 end_enemy_shots:lw	$ra, ($sp)
+		addi	$sp, $sp, 4		# Recupera da pilha o endereço de chamada
+		jr	$ra			# Retorna para o endereço de chamada
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+enemy_shot_anim:subi	$sp, $sp, 4
+		sw	$ra, ($sp)		# Salva na pilha de chamada
+
+		sw	$t1, screen_data($t0)	# Desenha o ponto da frente do tiro
+
+		addi	$t0, $t0, 4
+		sw	$t1, screen_data($t0)	# Desenha o ponto de trás do tiro. Só faz algo no
+						#	primeiro frame, mas n vale à pela verificar
+
+		addi	$t0, $t0, 4
+		li	$t1, 0x00000000
+		sw	$t1, screen_data($t0)	# Apaga o ponto de trás do frame anterior
+
+		lw	$ra, ($sp)
 		addi	$sp, $sp, 4		# Recupera da pilha o endereço de chamada
 		jr	$ra			# Retorna para o endereço de chamada
 
