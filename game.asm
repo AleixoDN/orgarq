@@ -24,20 +24,87 @@ screen_data:	.space	0x00001000		# Reserva o espaço de memoria para o bitmap
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-main:		li	$s0, 25			# Nave inicia no meio da tela
-		li	$s1, 0x0000FFFF		# Redesenha uma posição a cima
-		jal	ally_ship		# Desenha a nave inicialmente
-
-		li	$s4, 0x00000000		# Inicia sem naves nem tiros inimigos
+main:		li	$s4, 0x00000000		# Inicia sem naves nem tiros inimigos
 		li	$s6, 0			# Contador de loop de atualização de tela para
 						#	temporização de animação dos tiros inimigos
 		li	$s7, 0			# Contador de loop de atualização de tela para
 						#	temporização de animação do tiro aliado
 
-		li	$t7, 0			# Pré-seta a posição horizontal do tiro 1
-		li	$t6, 0			# Pré-seta a posição horizontal do tiro 2
-		li	$t5, 0			# Pré-seta a posição horizontal do tiro 3
-		li	$t4, 0			# Pré-seta a posição horizontal do tiro 4
+		li	$t7, 0			# Pré-seta a posição horizontal do tiro 1 inimigo
+		li	$t6, 0			# Pré-seta a posição horizontal do tiro 2 inimigo
+		li	$t5, 0			# Pré-seta a posição horizontal do tiro 3 inimigo
+		li	$t4, 0			# Pré-seta a posição horizontal do tiro 4 inimigo
+
+		li	$s1, 0x00FFFFFF
+		jal	start_screen
+
+		li	$s0, 30
+		li	$s1, 0x0000FFFF
+		jal	ally_ship
+
+		li	$s3, 27
+		li	$s1, 0x00FFFF00
+		jal	enemy_ship
+
+		li	$s3, 47
+		li	$s1, 0x00FFFF00
+		jal	enemy_ship
+		
+		li	$t0, 30
+		mul	$t0, $t0, 0x00000100
+		add	$t0, $t0, 72
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim
+		
+		li	$t0, 50
+		mul	$t0, $t0, 0x00000100
+		add	$t0, $t0, 132
+		li	$t1, 0x00FF0000
+		jal	enemy_shot_anim
+
+		li	$t8, 31
+		li	$t9, 140
+		jal	ally_shot_anim
+
+pre_loop:	li	$s2, 0			# Reseta registrador de input do MMIO
+		jal	MMIO_read		# Verifica input pelo terminal MMIO
+
+		beq	$s2, 'q', end_game
+
+		bne	$s2, 's', pre_loop
+
+		li	$s1, 0x00000000
+		jal	start_screen
+
+		li	$s0, 30
+		li	$s1, 0x00000000
+		jal	ally_ship
+
+		li	$s3, 27
+		li	$s1, 0x00000000
+		jal	enemy_ship
+
+		li	$s3, 47
+		li	$s1, 0x00000000
+		jal	enemy_ship
+		
+		li	$t0, 30
+		mul	$t0, $t0, 0x00000100
+		add	$t0, $t0, 72
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim
+		
+		li	$t0, 50
+		mul	$t0, $t0, 0x00000100
+		add	$t0, $t0, 132
+		li	$t1, 0x00000000
+		jal	enemy_shot_anim
+		
+		jal	ally_shot_del
+
+		li	$s0, 25			# Nave inicia no meio da tela
+		li	$s1, 0x0000FFFF
+		jal	ally_ship		# Desenha a nave inicialmente
 
 main_loop:	li	$s2, 0			# Reseta registrador de input do MMIO
 		jal	MMIO_read		# Verifica input pelo terminal MMIO
@@ -50,8 +117,200 @@ main_loop:	li	$s2, 0			# Reseta registrador de input do MMIO
 
 		bne	$s2, 'q', main_loop	# Verifica se foi inserido comando de quit
 
-		li	$v0, 10
+end_game:	li	$v0, 10
 		syscall				# Encerra o programa
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+start_screen:	subi	$sp, $sp, 4
+		sw	$ra, ($sp)		# Salva na pilha de chamada
+
+		li	$t0, 3			# Iniciando o texto na 3a linha
+		mul	$t0, $t0, 0x00000100	# n pixels até a linha = n linhas * 64 pixels por
+						#	por linha * 4 bytes por pixel
+
+		# Linha 1
+		# Letra S
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 24
+		sw	$s1, screen_data($t0)
+		# Letra s
+		addi	$t0, $t0, 44
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 56
+		sw	$s1, screen_data($t0)
+
+		# Linha 2
+		# Letra S
+		addi	$t0, $t0, 104
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 28
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra o
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra s
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra a
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra r
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 8
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+
+		# Linha 3
+		# Letra S
+		addi	$t0, $t0, 100
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 24
+		sw	$s1, screen_data($t0)
+		# Letra o
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		# Letra s
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		# Letra a
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		# Letra r
+		addi	$t0, $t0, 8
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+
+		# Linha 4
+		# Letra S
+		addi	$t0, $t0, 116
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+		# Letra o
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		# Letra s
+		addi	$t0, $t0, 24
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		# Letra a
+		addi	$t0, $t0, 16
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		# Letra r
+		addi	$t0, $t0, 8
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+
+		# Linha 5
+		# Letra S
+		addi	$t0, $t0, 108
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 28
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra o
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra s
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 20
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra a
+		addi	$t0, $t0, 12
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+		# Letra r
+		addi	$t0, $t0, 8
+		sw	$s1, screen_data($t0)
+		# Letra t
+		addi	$t0, $t0, 24
+		sw	$s1, screen_data($t0)
+		addi	$t0, $t0, 4
+		sw	$s1, screen_data($t0)
+
+		lw	$ra, ($sp)
+		addi	$sp, $sp, 4		# Recupera da pilha o endereço de chamada
+		jr	$ra			# Retorna para o endereço de chamada
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -184,7 +443,7 @@ ally_ship:	subi	$sp, $sp, 4
 
 # Função que verifica se o comando para tipo foi inserido, e caso ja haja um tiro na tela, ela
 # executa uma etapa da animação do tiro.
-#	s0 - Posição da nave;
+#	s0 - Posição da nave aliada;
 #	s2 - Comando dado pelo teclado;
 #	s7 - Contador para definição de frequência de "frame" da animação de tiro;
 #	t8 - Posição vertical do tiro (baseado em onde a nave alida estava quando atirou);
@@ -462,10 +721,14 @@ end_enemy_cll:	lw	$ra, ($sp)
 
 # Função que observa as naves inimigas existentes e a posição da nave inimiga para determinar um
 # um ataque inimigo.
-#	t7 - Posição horizontal do tiro 1
-#	t6 - Posição horizontal do tiro 2
-#	t5 - Posição horizontal do tiro 3
-#	t4 - Posição horizontal do tiro 4
+#	s0 - Posição da nave aliada;
+#	s4 - Registrador de 8 nibbles (4 tiros e 4 naves - F se a entidade existe, 0 se não existe);
+#	s6 - Contador para definição de frequência de "frame" da animação dos tiros inimigos;
+#	t7 - Posição horizontal do tiro 1;
+#	t6 - Posição horizontal do tiro 2;
+#	t5 - Posição horizontal do tiro 3;
+#	t4 - Posição horizontal do tiro 4;
+#	Usa regs temporários t0 e t1.
 
 enemy_shots:	subi	$sp, $sp, 4
 		sw	$ra, ($sp)		# Salva na pilha de chamada
@@ -473,7 +736,7 @@ enemy_shots:	subi	$sp, $sp, 4
 		addu	$s6, $s6, 1		# Contagem de "frames" para o proximo quadro da 
 						#	animação.
 
-		bne	$s6, 0x00000300, end_ally_shot
+		bne	$s6, 0x00000150, end_ally_shot
 						# Ajuste de frequencia de animação.
 						#	Animação é executada a cada 150 "frames"
 		li	$s6, 0x00000000
@@ -692,6 +955,9 @@ end_enemy_shots:lw	$ra, ($sp)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+
+# Função que imprime na tela ou apaga da tela um tiro inimigo qualquer, dado uma posição.
+#	Usa regs temporários t0 e t1.
 
 enemy_shot_anim:subi	$sp, $sp, 4
 		sw	$ra, ($sp)		# Salva na pilha de chamada
